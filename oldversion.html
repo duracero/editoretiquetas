@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duracero Industrial Labeler</title>
+    <style>
+        /* --- RESET & VARS --- */
+        :root {
+            --bg-color: #1e1e20;
+            --sidebar-width: 280px;
+            --accent-color: #2563eb;
+            --text-primary: #18181b;
+            --a4-width: 210mm;
+            --a4-height: 297mm;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            color: #333;
+        }
+
+        /* --- ICONS --- */
+        .icon-svg { width: 16px; height: 16px; fill: currentColor; }
+
+        /* --- SIDEBAR --- */
+        #ui-sidebar {
+            width: var(--sidebar-width);
+            background: #2b2b2b;
+            border-right: 1px solid #3f3f46;
+            color: #e4e4e7;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            z-index: 100;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+
+        .app-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 0.5rem; color: white; }
+        .app-brand svg { width: 30px; height: 30px; fill: white; }
+        .app-brand span { font-weight: 700; letter-spacing: 1px; font-size: 1.1rem; }
+
+        h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.5px; color: #a1a1aa; margin: 0 0 0.8rem 0; border-bottom: 1px solid #3f3f46; padding-bottom: 5px; }
+
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        button {
+            padding: 0.6rem; border: 1px solid #3f3f46; background: #3f3f46; color: #e4e4e7;
+            border-radius: 4px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;
+        }
+        button:hover { background: #52525b; border-color: #71717a; }
+
+        button.primary { background: var(--accent-color); border-color: var(--accent-color); color: white; font-weight: 600; width: 100%; margin-top: auto; padding: 1rem; }
+        button.primary:hover { background: #1d4ed8; }
+
+        .helper-text { font-size: 0.75rem; color: #71717a; margin-top: 10px; line-height: 1.4; }
+
+        /* --- WORKSPACE --- */
+        #workspace {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-color: #1e1e20;
+            background-image: radial-gradient(#333 1px, transparent 1px);
+            background-size: 20px 20px;
+            cursor: default;
+        }
+
+        #workspace.pan-mode { cursor: grab; }
+        #workspace.pan-mode:active { cursor: grabbing; }
+        #workspace.pan-mode #sheet-rotator { pointer-events: none; user-select: none; }
+
+        #view-controls {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 50;
+            background: #2b2b2b; padding: 5px; border-radius: 8px; display: flex; gap: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        #view-controls button { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+
+        /* TRANSFORM LAYER */
+        #pan-layer { width: 100%; height: 100%; transform-origin: 0 0; will-change: transform; }
+
+        #sheet-rotator {
+            width: var(--a4-width); height: var(--a4-height);
+            transition: transform 0.3s ease;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        /* --- PHYSICAL SHEET WRAPPER --- */
+        #sheet {
+            background: white;
+            width: var(--a4-width); height: var(--a4-height);
+            position: relative; /* Container for absolute grids */
+        }
+
+        /* --- SHARED GRID STYLES --- */
+        .grid-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+        }
+
+        /* --- GHOST LAYER (Bottom) --- */
+        #ghost-layer {
+            z-index: 1;
+        }
+
+        .ghost-cell {
+            border: 1px dashed #e4e4e7;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ghost-cell:hover { background: #f4f4f5; }
+        .ghost-cell::after {
+            content: "+"; font-size: 2rem; color: #d4d4d8; opacity: 0; transform: scale(0.5); transition: all 0.2s;
+        }
+        .ghost-cell:hover::after { opacity: 1; transform: scale(1); }
+
+        /* --- LABELS LAYER (Top) --- */
+        #labels-container {
+            z-index: 10;
+            pointer-events: none; /* KEY FIX: Let clicks pass through empty spaces to ghost layer */
+        }
+
+        .label {
+            border: 1px solid #e5e5e5;
+            position: relative; display: flex; flex-direction: column; overflow: hidden; background: white;
+            transition: box-shadow 0.2s;
+            pointer-events: auto; /* KEY FIX: Re-enable clicks on labels */
+        }
+        .label:hover { z-index: 20; box-shadow: inset 0 0 0 2px var(--accent-color); }
+
+        .label-inner { flex: 1; padding: 15mm; display: flex; flex-direction: column; justify-content: flex-start; height: 100%; }
+
+        .label[data-orient="vertical"] .label-inner { writing-mode: vertical-rl; text-orientation: mixed; padding: 10mm; align-items: flex-start; }
+        .label[data-orient="vertical"] .logo-area { writing-mode: horizontal-tb; margin-bottom: 1rem; align-self: center; }
+
+        [contenteditable] { outline: none; cursor: text; }
+        [contenteditable]:hover { background: rgba(0,0,0,0.05); border-radius: 2px; }
+        [contenteditable]:focus { background: rgba(37, 99, 235, 0.05); }
+
+        .logo-area { height: 40px; display: flex; align-items: center; margin-bottom: 1rem; font-weight: 800; font-size: 0.9rem; letter-spacing: 1px; }
+        .logo-img { max-height: 100%; object-fit: contain; }
+
+        .title-group { flex: 1; }
+        .main-title { font-size: 2rem; font-weight: 800; text-transform: uppercase; line-height: 1.1; margin-bottom: 0.5rem; color: black; }
+        .sub-title { font-size: 1.2rem; font-weight: 500; color: #444; margin-bottom: 1rem; }
+        .meta-data { font-family: 'Courier New', monospace; font-size: 0.85rem; color: #666; border-left: 3px solid #000; padding-left: 10px; }
+        .label[data-orient="vertical"] .meta-data { border-left: none; border-top: 3px solid #000; padding-left: 0; padding-top: 10px; margin-top: auto; }
+
+        /* Tools Overlay */
+        .label-tools {
+            position: absolute; top: 5px; right: 5px; background: #18181b; border-radius: 4px;
+            display: none; flex-direction: column; gap: 1px; padding: 2px; z-index: 100;
+        }
+        .label:hover .label-tools { display: flex; }
+
+        .tool-btn {
+            background: transparent; border: none; color: white;
+            width: 26px; height: 26px;
+            font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer;
+        }
+        .tool-btn:hover { background: #3f3f46; color: white; }
+        .tool-btn.danger:hover { background: #ef4444; }
+
+        /* --- PRINT --- */
+        @media print {
+            @page { size: A4; margin: 0; }
+            body { display: block; background: white; height: auto; overflow: visible; }
+            #ui-sidebar, #view-controls { display: none; }
+            #workspace { width: 100%; height: 100%; overflow: visible; background: none; display: block; cursor: default; }
+            #workspace.pan-mode #sheet-rotator { pointer-events: auto; }
+
+            #pan-layer { transform: none !important; width: 100%; height: 100%; display: block; }
+            #sheet-rotator { transform: none !important; box-shadow: none; margin: 0; width: 100%; height: 100%; }
+
+            #sheet {
+                width: 210mm !important; height: 297mm !important;
+                -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0;
+            }
+            .label-tools, #ghost-layer { display: none !important; }
+            .label { border: 0.5px solid #ccc; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside id="ui-sidebar">
+    <div class="app-brand">
+        <svg viewBox="0 0 100 100">
+            <rect x="10" y="10" width="35" height="80" fill="#fff"/>
+            <rect x="55" y="10" width="35" height="35" fill="#2563eb"/>
+            <rect x="55" y="55" width="35" height="35" fill="#fff"/>
+        </svg>
+        <span>DURACERO</span>
+    </div>
+
+    <div>
+        <h3>Grid Presets</h3>
+        <div class="btn-grid">
+            <button onclick="applyPreset('compact')">9 Compact</button>
+            <button onclick="applyPreset('rows')">3 Rows</button>
+            <button onclick="applyPreset('cols')">3 Cols</button>
+            <button onclick="applyPreset('full')">Full Page</button>
+        </div>
+    </div>
+
+    <div>
+        <h3>Branding</h3>
+        <div class="btn-grid">
+            <button onclick="setGlobalLogo('duracero')">Duracero</button>
+            <button onclick="setGlobalLogo('novacero')">Novacero</button>
+            <button onclick="document.getElementById('file-input').click()">Upload</button>
+        </div>
+    </div>
+
+    <div>
+        <h3>Controls</h3>
+        <p class="helper-text">
+            <strong>Zoom:</strong> Cmd/Alt + Scroll<br>
+            <strong>Scroll:</strong> Mouse Wheel<br>
+            <strong>Pan:</strong> Space + Drag<br>
+            <strong>Shrink:</strong> Alt + Buttons
+        </p>
+    </div>
+
+    <button class="primary" onclick="window.print()">PRINT TO PDF</button>
+</aside>
+
+<!-- WORKSPACE -->
+<main id="workspace">
+    <div id="pan-layer">
+        <div id="sheet-rotator">
+            <div id="sheet">
+                <!-- BACKGROUND GHOST LAYER -->
+                <div id="ghost-layer" class="grid-layer">
+                    <!-- 9 Ghost cells generated by JS -->
+                </div>
+                <!-- ACTIVE LABELS CONTAINER -->
+                <div id="labels-container" class="grid-layer"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-controls">
+        <!-- Rotate Icon -->
+        <button onclick="rotateSheet()" title="Rotate 90°">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+        </button>
+        <button onclick="centerContent()" title="Fit to Screen">⤢</button>
+    </div>
+</main>
+
+<input type="file" id="file-input" accept="image/*" style="display:none">
+
+<script>
+    // --- CONSTANTS ---
+    const ICONS = {
+        rotate: '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>',
+        trash: '<svg class="icon-svg" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>'
+    };
+
+    // --- STATE & CONFIG ---
+    const workspace = document.getElementById('workspace');
+    const panLayer = document.getElementById('pan-layer');
+    const sheetRotator = document.getElementById('sheet-rotator');
+    const labelsContainer = document.getElementById('labels-container');
+    const ghostLayer = document.getElementById('ghost-layer');
+
+    const PRESETS = {
+        'compact': Array(9).fill().map((_,i) => ({x:(i%3)+1, y:Math.floor(i/3)+1, w:1, h:1})),
+        'rows': [{x:1,y:1,w:3,h:1}, {x:1,y:2,w:3,h:1}, {x:1,y:3,w:3,h:1}],
+        'cols': [{x:1,y:1,w:1,h:3, o:'vertical'}, {x:2,y:1,w:1,h:3, o:'vertical'}, {x:3,y:1,w:1,h:3, o:'vertical'}],
+        'full': [{x:1,y:1,w:3,h:3}]
+    };
+
+    let scale = 1, panX = 0, panY = 0, rotation = 0;
+    let isSpacePressed = false, isDragging = false, lastMouseX, lastMouseY;
+    let isAltPressed = false;
+
+    // --- INIT ---
+    initGhosts();
+    applyPreset('compact');
+    setTimeout(centerContent, 10);
+    window.addEventListener('resize', centerContent);
+
+    // --- GHOST SYSTEM ---
+    function initGhosts() {
+        ghostLayer.innerHTML = '';
+        for(let i=0; i<9; i++) {
+            const x = (i % 3) + 1;
+            const y = Math.floor(i / 3) + 1;
+            const ghost = document.createElement('div');
+            ghost.className = 'ghost-cell';
+            ghost.style.gridColumnStart = x;
+            ghost.style.gridRowStart = y;
+            ghost.onclick = () => createLabel({x, y, w:1, h:1}, Date.now());
+            ghostLayer.appendChild(ghost);
+        }
+    }
+
+    // --- ALT KEY LISTENER ---
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Alt') {
+            isAltPressed = true;
+            updateButtonLabels();
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'Alt') {
+            isAltPressed = false;
+            updateButtonLabels();
+        }
+    });
+
+    function updateButtonLabels() {
+        const wBtns = document.querySelectorAll('.btn-w');
+        const hBtns = document.querySelectorAll('.btn-h');
+        wBtns.forEach(b => b.innerText = isAltPressed ? 'W-' : 'W+');
+        hBtns.forEach(b => b.innerText = isAltPressed ? 'H-' : 'H+');
+    }
+
+    // --- NAVIGATION ---
+    workspace.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey || e.altKey) {
+            const zoomIntensity = 0.1;
+            const delta = -Math.sign(e.deltaY);
+            const oldScale = scale;
+            const newScale = Math.min(Math.max(0.1, oldScale + (delta * zoomIntensity * oldScale)), 5);
+            const rect = workspace.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const scaleRatio = newScale / oldScale;
+            panX = mouseX - (mouseX - panX) * scaleRatio;
+            panY = mouseY - (mouseY - panY) * scaleRatio;
+            scale = newScale;
+        } else {
+            panX -= e.deltaX;
+            panY -= e.deltaY;
+        }
+        updateTransform();
+    }, { passive: false });
+
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !e.repeat && !document.activeElement.isContentEditable) {
+            e.preventDefault();
+            isSpacePressed = true;
+            workspace.classList.add('pan-mode');
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+            isSpacePressed = false;
+            workspace.classList.remove('pan-mode');
+            isDragging = false;
+        }
+    });
+
+    workspace.addEventListener('mousedown', (e) => {
+        if (isSpacePressed) {
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (isDragging && isSpacePressed) {
+            e.preventDefault();
+            panX += e.clientX - lastMouseX;
+            panY += e.clientY - lastMouseY;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            updateTransform();
+        }
+    });
+    window.addEventListener('mouseup', () => isDragging = false);
+
+    function updateTransform() { panLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`; }
+
+    function centerContent() {
+        const r = workspace.getBoundingClientRect();
+        scale = (r.height * 0.8) / sheetRotator.offsetHeight;
+        panX = (r.width - (sheetRotator.offsetWidth * scale)) / 2;
+        panY = (r.height - (sheetRotator.offsetHeight * scale)) / 2;
+        rotation = 0;
+        sheetRotator.style.transform = `rotate(0deg)`;
+        updateTransform();
+    }
+
+    function rotateSheet() {
+        rotation += 90;
+        sheetRotator.style.transform = `rotate(${rotation}deg)`;
+    }
+
+    // --- LABEL LOGIC ---
+
+    function applyPreset(name) {
+        labelsContainer.innerHTML = '';
+        PRESETS[name].forEach((cfg, idx) => createLabel(cfg, idx));
+    }
+
+    function createLabel(config, idSuffix) {
+        if(getCollision(config, null)) return;
+
+        const div = document.createElement('div');
+        div.className = 'label';
+        div.id = `lbl-${idSuffix}`;
+        if(config.o) div.setAttribute('data-orient', config.o);
+        updateGridPosition(div, config);
+
+        div.innerHTML = `
+                <div class="label-tools">
+                    <button class="tool-btn" onclick="toggleOrient(this)" title="Rotate Text">${ICONS.rotate}</button>
+                    <button class="tool-btn btn-w" onclick="modifySpan(this, 'w')" title="Width">W+</button>
+                    <button class="tool-btn btn-h" onclick="modifySpan(this, 'h')" title="Height">H+</button>
+                    <button class="tool-btn danger" onclick="deleteLabel(this)" title="Delete">${ICONS.trash}</button>
+                </div>
+                <div class="label-inner">
+                    <div class="logo-area logo-duracero">DURACERO</div>
+                    <div class="title-group">
+                        <div class="main-title" contenteditable="true">LABEL</div>
+                        <div class="sub-title" contenteditable="true">Description</div>
+                    </div>
+                    <div class="meta-data" contenteditable="true">
+                        REF: #001<br>LOC: A-1
+                    </div>
+                </div>
+            `;
+        labelsContainer.appendChild(div);
+        updateButtonLabels();
+    }
+
+    function updateGridPosition(el, cfg) {
+        el.style.gridColumnStart = cfg.x;
+        el.style.gridColumnEnd = `span ${cfg.w}`;
+        el.style.gridRowStart = cfg.y;
+        el.style.gridRowEnd = `span ${cfg.h}`;
+        el.dataset.x = cfg.x; el.dataset.y = cfg.y; el.dataset.w = cfg.w; el.dataset.h = cfg.h;
+    }
+
+    function deleteLabel(btn) {
+        btn.closest('.label').remove();
+    }
+
+    // --- COLLISION & MODIFICATION ---
+
+    function modifySpan(btn, dim) {
+        const label = btn.closest('.label');
+        let w = parseInt(label.dataset.w);
+        let h = parseInt(label.dataset.h);
+        const x = parseInt(label.dataset.x);
+        const y = parseInt(label.dataset.y);
+
+        const delta = isAltPressed ? -1 : 1;
+
+        if (dim === 'w') w += delta;
+        if (dim === 'h') h += delta;
+
+        // Constraints
+        if (w < 1) w = 1;
+        if (h < 1) h = 1;
+        if (x + w - 1 > 3) w = 3 - x + 1;
+        if (y + h - 1 > 3) h = 3 - y + 1;
+
+        const newCfg = {x, y, w, h};
+
+        // COLLISION
+        if (!isAltPressed) {
+            const collidedLabel = getCollision(newCfg, label);
+            if (collidedLabel) {
+                collidedLabel.remove();
+            }
+        }
+
+        updateGridPosition(label, newCfg);
+    }
+
+    function getCollision(targetCfg, excludeLabel) {
+        const targetCells = [];
+        for(let i=0; i<targetCfg.w; i++) {
+            for(let j=0; j<targetCfg.h; j++) {
+                targetCells.push(`${targetCfg.x + i}-${targetCfg.y + j}`);
+            }
+        }
+
+        const labels = Array.from(document.querySelectorAll('.label'));
+        for (let lbl of labels) {
+            if (lbl === excludeLabel) continue;
+
+            const lx = parseInt(lbl.dataset.x);
+            const ly = parseInt(lbl.dataset.y);
+            const lw = parseInt(lbl.dataset.w);
+            const lh = parseInt(lbl.dataset.h);
+
+            for(let i=0; i<lw; i++) {
+                for(let j=0; j<lh; j++) {
+                    const cellKey = `${lx + i}-${ly + j}`;
+                    if (targetCells.includes(cellKey)) {
+                        return lbl;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    function toggleOrient(btn) {
+        const l = btn.closest('.label');
+        l.setAttribute('data-orient', l.getAttribute('data-orient') === 'vertical' ? 'horizontal' : 'vertical');
+    }
+
+    function setGlobalLogo(type) {
+        document.querySelectorAll('.logo-area').forEach(area => {
+            area.innerHTML = '';
+            if(type === 'duracero') { area.innerText = 'DURACERO'; area.style.color = 'black'; }
+            else if (type === 'novacero') { area.innerText = 'NOVACERO'; area.style.color = '#1976d2'; }
+        });
+    }
+
+    document.getElementById('file-input').addEventListener('change', (e) => {
+        if (e.target.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                document.querySelectorAll('.logo-area').forEach(area => {
+                    area.innerHTML = `<img src="${evt.target.result}" class="logo-img">`;
+                });
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    });
+</script>
+</body>
+</html>
