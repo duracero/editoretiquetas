@@ -57,8 +57,8 @@ export const applyPreset = (presetName: keyof typeof PRESETS) => {
     w: cfg.w,
     h: cfg.h,
     orientation: cfg.orientation || 'horizontal',
-    title: 'LABEL',
-    subtitle: 'Description',
+    title: 'ETIQUETA',
+    subtitle: 'Descripción',
     meta: 'REF: #001\nLOC: A-1',
     logoType: $branding.get().type === 'custom' ? undefined : $branding.get().type
   } as LabelData));

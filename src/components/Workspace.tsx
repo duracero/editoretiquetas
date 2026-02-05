@@ -52,7 +52,7 @@ export default function Workspace() {
   };
 
   const handleRotate = () => {
-    setRotation(prev => prev + 90);
+    setRotation(prev => (prev + 90) % 360);
   };
 
   useEffect(() => {

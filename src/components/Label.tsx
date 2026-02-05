@@ -1,8 +1,8 @@
 import { type LabelData, updateLabel, removeLabel, checkCollision, $branding } from '../store';
 import { useStore } from '@nanostores/preact';
 import { Trash2, RefreshCw } from 'lucide-preact';
-import { useEffect, useState } from 'preact/hooks';
 import clsx from 'clsx';
+import EditableText from './EditableText';
 
 interface Props {
   data: LabelData;
@@ -11,12 +11,6 @@ interface Props {
 
 export default function Label({ data, isAltPressed }: Props) {
   const branding = useStore($branding);
-  const [localTitle, setLocalTitle] = useState(data.title);
-  const [localSubtitle, setLocalSubtitle] = useState(data.subtitle);
-  const [localMeta, setLocalMeta] = useState(data.meta);
-
-  // Sync collision or complex logic updates might be needed here, 
-  // but mostly we update the store and let the parent re-render if position changes.
   
   const handleModifySpan = (dim: 'w' | 'h') => {
     let { x, y, w, h } = data;
@@ -47,14 +41,29 @@ export default function Label({ data, isAltPressed }: Props) {
     updateLabel(data.id, { orientation: data.orientation === 'vertical' ? 'horizontal' : 'vertical' });
   };
 
-  // Content Editable handlers
   const handleInput = (field: keyof LabelData, value: string) => {
     updateLabel(data.id, { [field]: value });
   };
 
+  const resolveLogo = () => {
+    if (data.logoType) return data.logoType;
+    return branding.type;
+  };
+
+  const cycleLogo = () => {
+    const current = data.logoType;
+    let next: 'duracero' | 'novacero' | undefined;
+    
+    if (current === undefined) next = 'duracero';
+    else if (current === 'duracero') next = 'novacero';
+    else next = undefined;
+    
+    updateLabel(data.id, { logoType: next });
+  };
+
   return (
     <div
-      className="label border border-zinc-200 bg-white relative flex flex-col overflow-hidden transition-shadow group hover:z-20 hover:shadow-[inset_0_0_0_2px_#2563eb]"
+      className="label pointer-events-auto border border-zinc-200 bg-white relative flex flex-col overflow-hidden transition-shadow group hover:z-20 hover:shadow-[inset_0_0_0_2px_#2563eb]"
       style={{
         gridColumn: `${data.x} / span ${data.w}`,
         gridRow: `${data.y} / span ${data.h}`,
@@ -62,84 +71,94 @@ export default function Label({ data, isAltPressed }: Props) {
     >
       {/* Tools Overlay */}
       <div className="label-tools absolute top-1 right-1 bg-zinc-900 rounded hidden flex-col gap-[1px] p-[2px] z-50 group-hover:flex">
-        <button className="tool-btn w-6 h-6 flex items-center justify-center text-white hover:bg-zinc-700 rounded-sm" onClick={toggleOrient} title="Rotate Text">
+        <button className="tool-btn w-6 h-6 flex items-center justify-center text-white hover:bg-zinc-700 rounded-sm" onClick={toggleOrient} title="Rotar Texto">
           <RefreshCw size={12} />
         </button>
-        <button className="tool-btn w-6 h-6 flex items-center justify-center text-white text-[10px] font-bold hover:bg-zinc-700 rounded-sm" onClick={() => handleModifySpan('w')} title="Width">
+        <button className="tool-btn w-6 h-6 flex items-center justify-center text-white text-[10px] font-bold hover:bg-zinc-700 rounded-sm" onClick={() => handleModifySpan('w')} title="Ancho">
           {isAltPressed ? 'W-' : 'W+'}
         </button>
-        <button className="tool-btn w-6 h-6 flex items-center justify-center text-white text-[10px] font-bold hover:bg-zinc-700 rounded-sm" onClick={() => handleModifySpan('h')} title="Height">
+        <button className="tool-btn w-6 h-6 flex items-center justify-center text-white text-[10px] font-bold hover:bg-zinc-700 rounded-sm" onClick={() => handleModifySpan('h')} title="Alto">
           {isAltPressed ? 'H-' : 'H+'}
         </button>
-        <button className="tool-btn danger w-6 h-6 flex items-center justify-center text-white hover:bg-red-500 rounded-sm" onClick={() => removeLabel(data.id)} title="Delete">
+        <button className="tool-btn danger w-6 h-6 flex items-center justify-center text-white hover:bg-red-500 rounded-sm" onClick={() => removeLabel(data.id)} title="Eliminar">
           <Trash2 size={12} />
         </button>
       </div>
 
       {/* Content */}
       <div className={clsx(
-        "label-inner flex-1 p-[15mm] flex flex-col justify-start h-full",
+        "label-inner flex-1 flex flex-col justify-start h-full",
+        "p-2", // Reduced padding
         data.orientation === 'vertical' && "vertical-writing"
       )}>
-        {/* CSS for vertical writing needs to be handled via style or class if not standard tailwind */}
         <style>{`
           .vertical-writing {
              writing-mode: vertical-rl;
              text-orientation: mixed;
-             padding: 10mm;
+             padding: 0.5rem;
              align-items: flex-start;
           }
           .vertical-writing .logo-area {
             writing-mode: horizontal-tb;
-            margin-bottom: 1rem;
+            margin-bottom: 0.25rem;
             align-self: center;
+            
+            /* Sizing for vertical layout compatibility */
+            width: 24px; /* Matches h-6 (1.5rem = 24px) */
+            height: 100px; /* Space for the rotated logo width */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .vertical-writing .logo-area img {
+             transform: rotate(90deg); /* Clockwise rotation */
+             width: 100px;
+             height: 24px;
+             object-fit: contain;
           }
           .vertical-writing .meta-data {
              border-left: none;
-             border-top: 3px solid #000;
+             border-top: 2px solid #000;
              padding-left: 0;
-             padding-top: 10px;
+             padding-top: 6px;
              margin-top: auto;
           }
         `}</style>
 
-        <div className="logo-area h-[40px] flex items-center mb-4 font-extrabold text-sm tracking-widest uppercase">
-          {branding.type === 'custom' && branding.customImage ? (
+        <div 
+          className="logo-area h-6 flex items-center mb-1 font-extrabold text-sm tracking-widest uppercase cursor-pointer hover:opacity-80 transition-opacity shrink-0"
+          onClick={cycleLogo}
+          title="Clic para cambiar logo"
+        >
+          {resolveLogo() === 'custom' && branding.customImage ? (
              <img src={branding.customImage} className="max-h-full object-contain" alt="Logo" />
-          ) : branding.type === 'novacero' ? (
-             <span className="text-[#1976d2]">NOVACERO</span>
+          ) : resolveLogo() === 'novacero' ? (
+             <img src="/brand_logos/novacero_brand.png" className="max-h-full object-contain" alt="Novacero" />
           ) : (
-             <span className="text-black">DURACERO</span>
+             <img src="/brand_logos/duracero_brand.png" className="max-h-full object-contain" alt="Duracero" />
           )}
         </div>
 
-        <div className="title-group flex-1 min-h-0">
-          <div
-            contentEditable
-            suppressContentEditableWarning
-            onInput={(e) => handleInput('title', e.currentTarget.textContent || '')}
-            className="main-title text-[2rem] font-extrabold uppercase leading-[1.1] mb-2 text-black outline-none focus:bg-blue-50 hover:bg-zinc-50 rounded"
-          >
-            {data.title}
-          </div>
-          <div
-            contentEditable
-            suppressContentEditableWarning
-            onInput={(e) => handleInput('subtitle', e.currentTarget.textContent || '')}
-            className="sub-title text-[1.2rem] font-medium text-zinc-700 mb-4 outline-none focus:bg-blue-50 hover:bg-zinc-50 rounded"
-          >
-            {data.subtitle}
-          </div>
+        <div className="title-group flex-1 min-h-0 flex flex-col">
+          <EditableText
+            initialValue={data.title}
+            defaultText="ETIQUETA"
+            onUpdate={(val) => handleInput('title', val)}
+            className="main-title text-xl font-extrabold uppercase leading-[1.1] mb-1 text-black hover:bg-zinc-50 rounded min-w-[50px]"
+          />
+          <EditableText
+            initialValue={data.subtitle}
+            defaultText="Descripción"
+            onUpdate={(val) => handleInput('subtitle', val)}
+            className="sub-title text-xs font-medium text-zinc-700 mb-2 hover:bg-zinc-50 rounded min-w-[50px]"
+          />
         </div>
 
-        <div
-          contentEditable
-          suppressContentEditableWarning
-          onInput={(e) => handleInput('meta', e.currentTarget.textContent || '')}
-          className="meta-data font-mono text-[0.85rem] text-zinc-500 border-l-3 border-black pl-2 outline-none focus:bg-blue-50 hover:bg-zinc-50 rounded whitespace-pre-wrap"
-        >
-            {data.meta}
-        </div>
+        <EditableText
+          initialValue={data.meta}
+          onUpdate={(val) => handleInput('meta', val)}
+          className="meta-data font-mono text-[0.65rem] text-zinc-500 border-l-2 border-black pl-2 hover:bg-zinc-50 rounded whitespace-pre-wrap"
+        />
       </div>
     </div>
   );

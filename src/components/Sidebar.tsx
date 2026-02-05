@@ -33,7 +33,7 @@ export default function Sidebar() {
 
       {/* Presets */}
       <div>
-        <h3 className="text-xs uppercase tracking-widest text-zinc-400 mb-3 pb-1 border-b border-zinc-700">Grid Presets</h3>
+        <h3 className="text-xs uppercase tracking-widest text-zinc-400 mb-3 pb-1 border-b border-zinc-700">Distribución</h3>
         <div className="grid grid-cols-2 gap-2">
           {['compact', 'rows', 'cols', 'full'].map((preset) => (
             <button
@@ -41,7 +41,7 @@ export default function Sidebar() {
               onClick={() => applyPreset(preset as any)}
               className="p-2 border border-zinc-700 bg-zinc-700 text-zinc-200 rounded text-sm hover:bg-zinc-600 hover:border-zinc-500 transition-colors capitalize"
             >
-              {preset === 'compact' ? '9 Compact' : preset === 'rows' ? '3 Rows' : preset === 'cols' ? '3 Cols' : 'Full Page'}
+              {preset === 'compact' ? '9 Compacto' : preset === 'rows' ? '3 Filas' : preset === 'cols' ? '3 Columnas' : 'Página Completa'}
             </button>
           ))}
         </div>
@@ -49,7 +49,7 @@ export default function Sidebar() {
 
       {/* Branding */}
       <div>
-        <h3 className="text-xs uppercase tracking-widest text-zinc-400 mb-3 pb-1 border-b border-zinc-700">Branding</h3>
+        <h3 className="text-xs uppercase tracking-widest text-zinc-400 mb-3 pb-1 border-b border-zinc-700">Marca</h3>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setBrand('duracero')}
@@ -64,7 +64,7 @@ export default function Sidebar() {
             Novacero
           </button>
           <label className="p-2 border border-zinc-700 bg-zinc-700 text-zinc-200 rounded text-sm hover:bg-zinc-600 hover:border-zinc-500 transition-colors cursor-pointer text-center">
-            Upload
+            Subir Logo
             <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
           </label>
         </div>
@@ -72,12 +72,12 @@ export default function Sidebar() {
 
       {/* Controls Helper */}
       <div>
-        <h3 className="text-xs uppercase tracking-widest text-zinc-400 mb-3 pb-1 border-b border-zinc-700">Controls</h3>
+        <h3 className="text-xs uppercase tracking-widest text-zinc-400 mb-3 pb-1 border-b border-zinc-700">Controles</h3>
         <div className="text-xs text-zinc-400 leading-relaxed">
           <p><strong>Zoom:</strong> Cmd/Alt + Scroll</p>
-          <p><strong>Scroll:</strong> Mouse Wheel</p>
-          <p><strong>Pan:</strong> Space + Drag</p>
-          <p><strong>Resize:</strong> W/H Buttons (Alt to shrink)</p>
+          <p><strong>Scroll:</strong> Rueda del Mouse</p>
+          <p><strong>Pan:</strong> Espacio + Arrastrar</p>
+          <p><strong>Redimensionar:</strong> Botones W/H (Alt para reducir)</p>
         </div>
       </div>
 
@@ -86,7 +86,7 @@ export default function Sidebar() {
         onClick={() => window.print()}
         className="mt-auto w-full p-4 bg-blue-600 text-white font-bold rounded hover:bg-blue-700 transition-colors"
       >
-        PRINT TO PDF
+        IMPRIMIR A PDF
       </button>
     </aside>
   );
