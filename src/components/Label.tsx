@@ -61,9 +61,27 @@ export default function Label({ data, isAltPressed }: Props) {
     updateLabel(data.id, { logoType: next });
   };
 
+  // Dimensions based on A4 sheet (210mm x 297mm) and 3x3 grid
+  const CELL_W = 70;
+  const CELL_H = 99;
+  
+  const isVertical = data.orientation === 'vertical';
+
+  const innerStyle = isVertical ? {
+    width: `${data.h * CELL_H}mm`,
+    height: `${data.w * CELL_W}mm`,
+    position: 'absolute' as const,
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%) rotate(90deg)',
+  } : {
+    width: '100%',
+    height: '100%'
+  };
+
   return (
     <div
-      className="label pointer-events-auto border border-zinc-200 bg-white relative flex flex-col overflow-hidden transition-shadow group hover:z-20 hover:shadow-[inset_0_0_0_2px_#2563eb]"
+      className="label pointer-events-auto border border-zinc-200 bg-white relative overflow-hidden transition-shadow group hover:z-20 hover:shadow-[inset_0_0_0_2px_#2563eb]"
       style={{
         gridColumn: `${data.x} / span ${data.w}`,
         gridRow: `${data.y} / span ${data.h}`,
@@ -86,47 +104,15 @@ export default function Label({ data, isAltPressed }: Props) {
       </div>
 
       {/* Content */}
-      <div className={clsx(
-        "label-inner flex-1 flex flex-col justify-start h-full",
-        "p-2", // Reduced padding
-        data.orientation === 'vertical' && "vertical-writing"
-      )}>
-        <style>{`
-          .vertical-writing {
-             writing-mode: vertical-rl;
-             text-orientation: mixed;
-             padding: 0.5rem;
-             align-items: flex-start;
-          }
-          .vertical-writing .logo-area {
-            writing-mode: horizontal-tb;
-            margin-bottom: 0.25rem;
-            align-self: center;
-            
-            /* Sizing for vertical layout compatibility */
-            width: 24px; /* Matches h-6 (1.5rem = 24px) */
-            height: 100px; /* Space for the rotated logo width */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .vertical-writing .logo-area img {
-             transform: rotate(90deg); /* Clockwise rotation */
-             width: 100px;
-             height: 24px;
-             object-fit: contain;
-          }
-          .vertical-writing .meta-data {
-             border-left: none;
-             border-top: 2px solid #000;
-             padding-left: 0;
-             padding-top: 6px;
-             margin-top: auto;
-          }
-        `}</style>
-
+      <div 
+        className={clsx(
+          "label-inner flex flex-col justify-start",
+          "p-6" // Increased padding
+        )}
+        style={innerStyle}
+      >
         <div 
-          className="logo-area h-6 flex items-center mb-1 font-extrabold text-sm tracking-widest uppercase cursor-pointer hover:opacity-80 transition-opacity shrink-0"
+          className="logo-area h-6 flex items-center mb-2 font-extrabold text-sm tracking-widest uppercase cursor-pointer hover:opacity-80 transition-opacity shrink-0"
           onClick={cycleLogo}
           title="Clic para cambiar logo"
         >
