@@ -162,9 +162,9 @@ export default function Label({ data, isAltPressed }: Props) {
               {resolveLogo() === 'custom' && branding.customImage ? (
                  <img src={branding.customImage} className="max-h-full object-contain" alt="Logo" />
               ) : resolveLogo() === 'novacero' ? (
-                 <img src={`${import.meta.env.BASE_URL}brand_logos/novacero_brand.png`} className="max-h-full object-contain" alt="Novacero" />
+                 <img src={`${import.meta.env.BASE_URL}/brand_logos/novacero_brand.png`} className="max-h-full object-contain" alt="Novacero" />
               ) : (
-                 <img src={`${import.meta.env.BASE_URL}brand_logos/duracero_brand.png`} className="max-h-full object-contain" alt="Duracero" />
+                 <img src={`${import.meta.env.BASE_URL}/brand_logos/duracero_brand.png`} className="max-h-full object-contain" alt="Duracero" />
               )}
             </div>
             <FieldRemover onClick={() => handleRemoveField('logo')} />
